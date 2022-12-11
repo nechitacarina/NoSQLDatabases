@@ -1,0 +1,41 @@
+{
+    "doctors": [
+    {
+        "id": 1,
+        "full_name": "Alex Agapescu",
+        "medical_specialisation": "ultrasound",
+        "hours_worked_per_day": 3,
+        "date_of_employment": "2018-03-24"
+    }
+    ],
+    "clinics": [
+    {
+        "id": 1,
+        "name": "Regina Maria",
+        "location": "Cluj-Napoca",
+        "phone_number":"0219268",
+        "email":"stem@reginamaria.ro"
+    },
+    {
+        "id": 2,
+        "name": "Star Medica",
+        "location": "Satu Mare",
+        "phone_number": "0361426926",
+        "email": "programare@starmedica.ro"
+    },
+    {
+        "id": 3,
+        "name": "MedLife ",
+        "location": "Cluj-Napoca",
+        "phone_number":"0264960",
+        "email":"office@medlife.ro"
+    }
+    ],
+    "employees": [
+    {
+        "doctor_id": 1,
+        "clinic_id": 1
+    }
+    ]
+}
+    

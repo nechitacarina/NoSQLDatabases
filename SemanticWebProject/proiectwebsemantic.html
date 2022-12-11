@@ -1,0 +1,208 @@
+<html>
+
+<head>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+    
+    <script>
+
+        server_adress = "http://localhost:4000/clinics";
+        $.getJSON(server_adress, data => {
+            $.each(data, function (pointer, clinic) {
+                $('#list_of_clinics').append('<option value="' + clinic.id + '">' + clinic.name + '</option>');
+            })
+        });
+
+        function jsonServer(){
+            insert_doctor();
+        }
+
+        function insert_doctor() {
+            serializedData = JSON.stringify({full_name: $('#name_of_doctor').val(), medical_specialisation: $('#specialisation_of_doctor').val(), hours_worked_per_day: $('#number_of_hours_worked_per_day').val(), date_of_employment: $('#date_of_employment').val()})
+            $.ajax({
+                type: "POST",
+                url: "http://localhost:4000/doctors",
+                data: serializedData,
+                contentType: "application/json",
+                success: insert_employees
+            });
+        }
+
+        function insert_employees() {
+            server_adress = "http://localhost:4000/doctors?q=" + $('#name_of_doctor').val();
+            $.getJSON(server_adress, data => {
+                list_of_doctor_ids = "<li id='doctor_id' style='list-style:none;' value=" + data[data.length - 1].id + "></li>"
+                $(list_of_doctor_ids).appendTo(document.body)
+
+                serializedData = JSON.stringify({ "doctorId": $('#doctor_id').val(), "clinicId": parseInt($('#list_of_clinics').val())})
+                $.ajax({
+                    type: "POST",
+                    url: "http://localhost:4000/employees",
+                    data: serializedData,
+                    contentType: "application/json",
+                    success: display_jsonServer
+                });
+            });
+        }
+
+        function display_jsonServer() {
+            server_adress = "http://localhost:4000/employees?_expand=doctor&_expand=clinic"
+            $.getJSON(server_adress, answer => {
+                data = answer
+                $.each(answer, function (index, employees) {
+                    items = '<tr><td>' + employees.doctor.full_name + '</td><td>' + employees.doctor.medical_specialisation + '</td><td>' + employees.doctor.hours_worked_per_day + '</td><td>' + employees.doctor.date_of_employment + '</td><td>'
+                        + employees.clinic.name + '</td><td>' +  employees.clinic.location + '</td><td>' +  employees.clinic.phone_number + '</td><td>' + employees.clinic.email +'</td></tr>';
+                    $(items).appendTo('#tableJSONServer')
+                });
+            });
+        }
+        function graphQLServer() {
+            $.each(data, function (index, employees) {
+                if (index >= 1) {
+                    JavaScript_obj = { query: `mutation{createDoctor(full_name:"${employees.doctor.full_name}", medical_specialisation:"${employees.doctor.medical_specialisation}", hours_worked_per_day:${employees.doctor.hours_worked_per_day}, date_of_employment:"${employees.doctor.date_of_employment}"){id}}`}
+                    Json_obj = JSON.stringify(JavaScript_obj)
+                    config = {
+                        url: "http://localhost:3000",
+                        type: "POST",
+                        data: Json_obj,
+                        contentType: "application/json",
+                    }
+                    $.ajax(config)
+                    JavaScript_obj = {query: `mutation{createEmployee(doctor_id:${employees.doctorId} clinic_id:${employees.clinicId}) {doctor_id clinic_id}}`}
+                    Json_obj = JSON.stringify(JavaScript_obj)
+                    config = {
+                        url: "http://localhost:3000",
+                        type: "POST",
+                        data: Json_obj,
+                        contentType: "application/json"
+                       
+                    }
+                    $.ajax(config)
+                }
+            })
+            JavaScript_obj = {query: "{allEmployees{doctor_id clinic_id Doctor{full_name medical_specialisation hours_worked_per_day date_of_employment}  Clinic{name location phone_number email}}}"}
+            Json_obj = JSON.stringify(JavaScript_obj)
+            config = {
+                url: "http://localhost:3000",
+                type: "POST",
+                data: Json_obj,
+                contentType: "application/json",
+                success: answer_grafQL
+            }
+            $.ajax(config)
+        }
+
+        function answer_grafQL(answer) {
+            records = answer.data.allEmployees
+            $.each(records, display_grafQL)
+        }
+
+        function display_grafQL(index, record) {
+            items = '<tr><td>' + record.Doctor.full_name + '</td><td>' + record.Doctor.medical_specialisation + '</td><td>' + record.Doctor.hours_worked_per_day + '</td><td>' + record.Doctor.date_of_employment + '</td><td>'
+                        + record.Clinic.name + '</td><td>' +  record.Clinic.location + '</td><td>' +  record.Clinic.phone_number + '</td><td>' + record.Clinic.email +'</td></tr>';
+            $("#tableQL").append(items)
+        }
+
+        function RDFServer()
+		{	
+            $.each(data, function (index, employees) {
+                query1=`prefix : <http://carina.ro#> insert data {GRAPH :doctor {:Doctor :full_name "${employees.doctor.full_name}"; :medical_specialisation "${employees.doctor.medical_specialisation}"; :hours_worked_per_day ${employees.doctor.hours_worked_per_day}; :date_of_employment "${employees.doctor.date_of_employment}"^^xsd:date}}`
+                $.post("http://localhost:8080/rdf4j-server/repositories/examen/statements",{update:query1})
+
+                query2=`prefix : <http://carina.ro#> insert data {GRAPH :clinic {:Clinic :name "${employees.clinic.name}"; :location "${employees.clinic.location}"; :phone_number "${employees.clinic.phone_number}"; :email "${employees.clinic.email}"}}`
+                $.post("http://localhost:8080/rdf4j-server/repositories/examen/statements",{update:query2})
+                    
+                query3="prefix : <http://carina.ro#> insert data {GRAPH :employee {:Employee :hasDoctor :Doctor; :hasClinic [:idClinic :Clinic]}}"
+                $.post("http://localhost:8080/rdf4j-server/repositories/examen/statements",{update:query3},select_RDFServer) 
+            })	
+		}
+		function select_RDFServer()
+		{
+			query=encodeURIComponent("prefix : <http://carina.ro#> select  ?full_name ?medical_specialisation ?hours_worked_per_day ?date_of_employment ?name ?location ?phone_number ?email where  {GRAPH :employee {?doctor_clinic :hasDoctor  ?doctor. ?doctor_clinic :hasClinic ?item. ?item  :idClinic ?clinic} GRAPH :clinic {?clinic :name ?name; :location ?location; :phone_number ?phone_number; :email ?email} GRAPH :doctor {?doctor :full_name ?full_name; :medical_specialisation ?medical_specialisation; :hours_worked_per_day ?hours_worked_per_day; :date_of_employment ?date_of_employment}}")	
+			$.get("http://localhost:8080/rdf4j-server/repositories/examen?interogare="+query,answer_processing,"json")
+           
+		}
+		function answer_processing(answer)
+		{
+			data=answer.results.bindings
+			$.each(data,display_RDF)
+		}
+		function display_RDF(indice,record)
+		{        
+			items = '<tr><td>' + record.full_name.value + '</td><td>'+ record.medical_specialisation.value +'</td><td>'  +  record.hours_worked_per_day.value + '</td><td>'  +  record.date_of_employment.value + '</td><td>'  +  record.name.value + '</td><td>'  +  record.location.value + '</td><td>' + record.phone_number.value + '</td><td>' + record.email.value + '</td></tr>';
+			$(items).appendTo('#tableRDF')	
+            
+		}
+    </script>
+
+    <style>
+        table,
+        th,
+        td {
+            border: 1px solid black;
+            text-align: center;
+        }
+    </style>
+
+</head>
+
+<body>
+    <form>
+        <div>Doctor's Name:<input type="text" id="name_of_doctor"></div>
+        <div>Medical Specialisation<input type="text" id="specialisation_of_doctor"></div>
+        <div>Hours worked/day<input type="number" id="number_of_hours_worked_per_day"></div>
+        <div>Employment Date<input type="date" id="date_of_employment"></div>
+        <div>Clinic:
+            <select id="list_of_clinics">
+                <option value="" id="clinic">-- Select --</option>
+            </select>
+        </div>
+        <input type="button" value="JSON Server" onclick="jsonServer()">
+        
+        <b>
+            <table id="tableJSONServer" style="border: 1px solid black;">
+                <tr>
+                    <th>Doctor</th>
+                    <th>Specialisation</th>
+                    <th>Hours worked per day</th>
+                    <th>Employment Date</th>
+                    <th>Clinic's Name</th>
+                    <th>Clinic's Location</th>
+                    <th>Clinic's Phone Number</th>
+                    <th>Clinic's Email</th>
+                </tr>
+            </table>
+    </form>
+
+    <br>
+    <input type="button" value="GraphQL Server" onclick="graphQLServer()">
+
+    <table id="tableQL" style="border: 1px solid black;">
+        <tr>
+            <th>Doctor</th>
+            <th>Specialisation</th>
+            <th>Hours worked per day</th>
+            <th>Employment Date</th>
+            <th>Clinic's Name</th>
+            <th>Clinic's Location</th>
+            <th>Clinic's Phone Number</th>
+            <th>Clinic's Email</th>
+        </tr>
+    </table>
+
+    <br>
+    <input type="button" value="RDF Server" onclick="RDFServer()">
+
+    <table id="tableRDF" style="border: 1px solid black;">
+        <tr>
+            <th>Doctor</th>
+            <th>Specialisation</th>
+            <th>Hours worked per day</th>
+            <th>Employment Date</th>
+            <th>Clinic's Name</th>
+            <th>Clinic's Location</th>
+            <th>Clinic's Phone Number</th>
+            <th>Clinic's Email</th>
+        </tr>
+    </table>
+</body>
+</html>
